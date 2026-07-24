@@ -46,7 +46,7 @@ ADMIN_EXTRA_ROLE_ID: int     = 1424847269148102656   # Cargo adicional
 # ── Módulo Contato ─────────────────────────────────────────────────────────────
 CONTATO_TARGET_ROLE_ID: int             = 1516088193240400054  # cargo mencionado em todo tópico
 CONTATO_INACTIVITY_TIMEOUT_SECONDS: int = 86400                # 24h (use 5 para teste)
-CONTATO_CLOSE_DELAY_SECONDS: int        = 86400                # 24h após !contato
+CONTATO_CLOSE_DELAY_SECONDS: int        = 40                   # teste: 40s após !contato
 
 # Modulo TI / Equipamentos
 EQUIPAMENTOS_ROLE_ID: int = 1519781852611875098  # cargo mencionado nos chamados de equipamentos
@@ -75,26 +75,26 @@ CONTATO_CONCLUSAO_MESSAGE: str = (
 # ── Configurações por guild ────────────────────────────────────────────────────
 SERVIDORES: dict[int, dict] = {
 
-    1407051681421594806: {
+    1516880237743439913: {
         "nome": "MLR",
         "empresa_clickup": "mlr_advogados", # Usado para preencher o campo de empresa no payload enviado ao N8N/ClickUp.
-        "canal_chamados_pendentes": 1521930365537615882, # Canal que recebe os cards de chamados inativos.
-        "canal_unificado": 1481687593224507554,
-        "canal_logs": 1429922070036217977,
+        "canal_chamados_pendentes": 1517618923774939256, # Canal que recebe os cards de chamados inativos.
+        "canal_unificado": 1516880239022706841,
+        "canal_logs": 1516880801755693106,
         "modulos_ativos": ["sistemas", "ti", "contato", "reembolso"],
 
         "ti": {
-            "cargo_ti":   1415390806541598831,
-            "cargo_equipamentos": 1519781852611875098,
-            "canal_logs": 1429922070036217977,
+            "cargo_ti":   1522244271812509696,
+            "cargo_equipamentos": 1522244271812509696,
+            "canal_logs": 1516880801755693106,
         },
 
         "sistemas": {
-            "cargo_ti": 1429922070036217977,
+            "cargo_ti": 1522244271812509696,
         },
 
         "contato": {
-            "keeper_role_id": 1415390806541598831,
+            "keeper_role_id": 1516881045159415978,
         },
     },
 
