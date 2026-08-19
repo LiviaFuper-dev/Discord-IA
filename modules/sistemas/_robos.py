@@ -5,10 +5,9 @@ Fluxo:
   Usuário clica "Robôs/Automações" → ephemeral RobosOpcaoView (some após escolha)
   → clica em INSS / ChatGuru / Planilhas / IA
   → modal abre pedindo descrição do problema (+ sugestão de print)
-  → on_submit: thread criada + payload inicializado + fluxo de cada subsistema
+  → on_submit: thread criada + payload inicializado + conversa com IA
 
 O payload base (system: "Automações", subsystem: opcao) é inicializado aqui.
-Cada fluxo filho adiciona seus steps via _update_step().
 Enviado ao N8N quando o TI executa !sistema.
 """
 
@@ -18,9 +17,7 @@ import datetime
 import discord
 
 import config
-from ._engine import PENDING_PAYLOADS, _ping_role, _update_step, set_payload
-from ._robo_inss import iniciar_fluxo_inss
-from ._robos_chatguru import iniciar_fluxo_chatguru
+from ._engine import PENDING_PAYLOADS, _start_ai_support, _update_step, set_payload
 
 _CARGO_TI_ID = 1415390806541598831
 
@@ -113,26 +110,15 @@ class RobosDescricaoModal(discord.ui.Modal):
             "por favor envie aqui — isso agiliza muito o diagnóstico!"
         )
 
-        # ── Ramifica por subsistema ────────────────────────────────────────────
-        if self.opcao == "INSS":
-            await iniciar_fluxo_inss(thread, user)
-
-        elif self.opcao == "ChatGuru":
-            await iniciar_fluxo_chatguru(thread, user)
-
-        elif self.opcao == "Planilhas":
-            _update_step(thread.id, "opcao_escolhida", "planilhas")
-            await _ping_role(
-                thread, guild, _CARGO_TI_ID,
-                "Nossa equipe foi acionada e entrará em contato em breve.",
-            )
-
-        elif self.opcao == "IA":
-            _update_step(thread.id, "opcao_escolhida", "ia")
-            await _ping_role(
-                thread, guild, _CARGO_TI_ID,
-                "Nossa equipe foi acionada e entrará em contato em breve.",
-            )
+        _update_step(thread.id, "opcao_escolhida", self.opcao.lower())
+        await _start_ai_support(
+            thread,
+            user,
+            initial_context=(
+                f"Área: Robôs/Automações. Subsistema: {self.opcao}."
+            ),
+            handoff_role_id=_CARGO_TI_ID,
+        )
 
         await interaction.followup.send("Tópico criado! Acesse-o para continuar.", ephemeral=True)
 

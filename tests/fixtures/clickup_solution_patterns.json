@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-08-03T00:00:00+00:00",
+  "tasks_read": 2,
+  "patterns": [
+    {
+      "sistema": "ChatGuru",
+      "problema": "Erro 131049",
+      "solucao": "Usar template aprovado e aguardar nova interação.",
+      "ocorrencias": 4
+    },
+    {
+      "sistema": "ClickUp",
+      "problema": "Página lenta",
+      "solucao": "Validar status do serviço antes de escalar.",
+      "ocorrencias": 2
+    }
+  ]
+}

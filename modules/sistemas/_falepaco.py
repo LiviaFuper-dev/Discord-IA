@@ -20,7 +20,7 @@ import datetime
 import discord
 
 import config
-from ._engine import PENDING_PAYLOADS, _ping_role, _update_step, set_payload
+from ._engine import PENDING_PAYLOADS, _start_ai_support, _update_step, set_payload
 from utils import n8n as n8n_utils
 
 _CARGO_FALEPACO_ID = 1415390806541598831
@@ -109,23 +109,15 @@ class FalepacoView(discord.ui.View):
         if not thread:
             return
 
-        await _ping_role(
-            thread, interaction.guild, _CARGO_FALEPACO_ID,
-            f"👋 Olá {interaction.user.mention}, tudo bem?\n\n"
-            "Vi que você deseja baixar o **Falepaco** 📥 e nossa equipe vai te ajudar com isso!\n\n"
-            "Antes de começarmos, preciso que você confirme uma coisa:\n"
-            "💻 **Você possui o aplicativo AnyDesk instalado no seu computador?**\n"
-            "🔎 Para verificar:\n"
-            "1️⃣ Aperte a **tecla Windows** no seu teclado.\n"
-            "2️⃣ Na barra de pesquisa, digite **AnyDesk**.\n"
-            "3️⃣ Abra o aplicativo.\n\n"
-            "Assim que ele abrir, você verá um **número ao lado da mensagem \"Este dispositivo\"**.\n"
-            "📨 **Envie esse número aqui no chat para nós.**\n\n"
-            "❗ Caso você **não tenha o AnyDesk instalado**, pode baixar por aqui:\n"
-            "🔗 https://anydesk.com/pt/downloads/windows\n\n"
-            "Depois é só clicar em **\"Baixe Agora\"** ⬇️\n\n"
-            "👨‍💻 Enquanto isso, já estou chamando nossa equipe para te ajudar no restante do processo.\n"
-            "Obrigado! 🙌",
+        await _start_ai_support(
+            thread,
+            interaction.user,
+            initial_context=(
+                "Sistema: Falepaco. Solicitação: baixar ou instalar o Falepaco. "
+                "Não peça acesso remoto nem dados do AnyDesk. Como a instalação "
+                "precisa da equipe, ofereça intervenção humana e aguarde confirmação."
+            ),
+            handoff_role_id=_CARGO_FALEPACO_ID,
         )
 
         await interaction.followup.send("Tópico criado! Acesse-o para continuar.", ephemeral=True)
@@ -182,12 +174,14 @@ class FalepacoView(discord.ui.View):
         if not thread:
             return
 
-        await _ping_role(
-            thread, interaction.guild, _CARGO_FALEPACO_ID,
-            f"Olá, {interaction.user.mention}! Tudo bem? 😊\n\n"
-            "Recebemos seu chamado sobre o **Falepaco**.\n\n"
-            "Por favor, descreva aqui o que está acontecendo com o máximo de detalhes possível "
-            "e nossa equipe entrará em contato em breve. 🙌",
+        await _start_ai_support(
+            thread,
+            interaction.user,
+            initial_context=(
+                "Sistema: Falepaco. Opção selecionada: outro problema. "
+                "Comece perguntando de forma simples o que está acontecendo."
+            ),
+            handoff_role_id=_CARGO_FALEPACO_ID,
         )
 
         await interaction.followup.send("Tópico criado! Acesse-o para continuar.", ephemeral=True)

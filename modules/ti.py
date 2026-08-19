@@ -16,7 +16,14 @@ import discord
 from discord.ext import commands
 
 import config
+from modules import ia as ia_module
 from utils import n8n as n8n_utils
+from utils.ai import AIServiceError
+from utils.resolution import (
+    RESULT_OPTIONS,
+    SOLUTION_OPTIONS,
+    build_resolution_payload,
+)
 from utils.thread_utils import safe_join_thread, remove_members_except
 
 
@@ -258,6 +265,27 @@ async def _criar_chamado(
         f"✅ Chamado criado: {thread.mention}", ephemeral=True
     )
 
+    try:
+        await ia_module.start_ai_conversation(
+            thread,
+            interaction.user,
+            urgency_label=nivel.split(" - ", 1)[-1],
+        )
+    except AIServiceError as e:
+        print(f"[TI] IA não iniciou automaticamente no tópico {thread.id}: {e}")
+        await thread.send(
+            f"⚠️ O chamado foi aberto, mas a IA não conseguiu iniciar automaticamente: {e}\n"
+            "Você pode tentar novamente com `!ajuda`.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+    except Exception as e:
+        print(f"[TI] Erro inesperado ao iniciar IA no tópico {thread.id}: {e}")
+        await thread.send(
+            "⚠️ O chamado foi aberto, mas o atendimento automático com IA está "
+            "temporariamente indisponível. A equipe pode continuar normalmente.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
     if original_interaction:
         await asyncio.sleep(3)
         try:
@@ -267,6 +295,27 @@ async def _criar_chamado(
 
 
 # ── Formulário de logs (!logs) ────────────────────────────────────────────────
+
+class ResolutionDescriptionModal(discord.ui.Modal, title="Descreva a solução aplicada"):
+    def __init__(self, target_view: "LogsFormView"):
+        super().__init__()
+        self.target_view = target_view
+        self.description = discord.ui.TextInput(
+            label="O que foi feito?",
+            style=discord.TextStyle.long,
+            placeholder="Descreva brevemente a ação realizada pelo TI.",
+            required=True,
+            min_length=5,
+            max_length=1000,
+        )
+        self.add_item(self.description)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        self.target_view.solution_description = self.description.value.strip()
+        await interaction.response.send_message(
+            "✅ Descrição da solução registrada.",
+            ephemeral=True,
+        )
 
 class LogsFormView(discord.ui.View):
     """
@@ -280,6 +329,9 @@ class LogsFormView(discord.ui.View):
         self.guild_id = guild_id
         self.selected_empresa: str | None = None
         self.selected_nivel: str | None = None
+        self.selected_solution: str | None = None
+        self.selected_result: str | None = None
+        self.solution_description: str | None = None
         self.form_response: dict | None = None
 
     @discord.ui.select(
@@ -287,6 +339,7 @@ class LogsFormView(discord.ui.View):
         min_values=1,
         max_values=1,
         custom_id="ti_logs_empresa",
+        row=0,
         options=[
             discord.SelectOption(label="Fuper",         value="fuper"),
             discord.SelectOption(label="Mlr Advogados", value="mlr_advogados"),
@@ -309,6 +362,7 @@ class LogsFormView(discord.ui.View):
         min_values=1,
         max_values=1,
         custom_id="ti_logs_nivel",
+        row=1,
         options=[
             discord.SelectOption(label="Baixo", value="Baixo"),
             discord.SelectOption(label="Médio", value="Médio"),
@@ -326,10 +380,62 @@ class LogsFormView(discord.ui.View):
         except Exception:
             pass
 
+    @discord.ui.select(
+        placeholder="Categoria da solução aplicada",
+        min_values=1,
+        max_values=1,
+        custom_id="ti_logs_solucao",
+        row=2,
+        options=[
+            discord.SelectOption(label=label, value=value)
+            for label, value in SOLUTION_OPTIONS
+        ],
+    )
+    async def solution_select(
+        self, interaction: discord.Interaction, select: discord.ui.Select
+    ):
+        self.selected_solution = select.values[0]
+        await interaction.response.send_message(
+            "✅ Categoria da solução selecionada.",
+            ephemeral=True,
+        )
+
+    @discord.ui.select(
+        placeholder="Resultado final do chamado",
+        min_values=1,
+        max_values=1,
+        custom_id="ti_logs_resultado",
+        row=3,
+        options=[
+            discord.SelectOption(label=label, value=value)
+            for label, value in RESULT_OPTIONS
+        ],
+    )
+    async def result_select(
+        self, interaction: discord.Interaction, select: discord.ui.Select
+    ):
+        self.selected_result = select.values[0]
+        await interaction.response.send_message(
+            "✅ Resultado final selecionado.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="📝 Descrever solução",
+        style=discord.ButtonStyle.secondary,
+        custom_id="ti_logs_descrever_solucao",
+        row=4,
+    )
+    async def describe_solution(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await interaction.response.send_modal(ResolutionDescriptionModal(self))
+
     @discord.ui.button(
         label="✅ Confirmar e gerar logs",
         style=discord.ButtonStyle.danger,
         custom_id="ti_logs_confirmar",
+        row=4,
     )
     async def confirmar(
         self, interaction: discord.Interaction, button: discord.ui.Button
@@ -347,20 +453,34 @@ class LogsFormView(discord.ui.View):
                 pass
             return
 
-        if not self.selected_empresa or not self.selected_nivel:
+        if (
+            not self.selected_empresa
+            or not self.selected_nivel
+            or not self.selected_solution
+            or not self.selected_result
+            or not self.solution_description
+        ):
             try:
                 await interaction.response.send_message(
-                    "❌ Selecione **Empresa** e **Nível** antes de confirmar.",
+                    "❌ Selecione **Empresa**, **Nível**, **Solução**, **Resultado** "
+                    "e descreva o que foi feito antes de confirmar.",
                     ephemeral=True,
                 )
             except Exception:
                 pass
             return
 
+        resolution = build_resolution_payload(
+            category=self.selected_solution,
+            result=self.selected_result,
+            description=self.solution_description,
+            resolver=member.display_name,
+        )
         self.form_response = {
             "empresa":             self.selected_empresa,
             "nivel_real_problema": self.selected_nivel,
             "confirmado_por":      member.display_name,
+            **resolution,
         }
 
         try:
@@ -465,6 +585,15 @@ async def _process_and_finalize(
             **empresa_payload,
             "nivel_real_problema": form_response.get("nivel_real_problema"),
             "confirmado_por":      form_response.get("confirmado_por"),
+            "solucao_final_categoria": form_response.get("solucao_final_categoria"),
+            "solucao_final_categoria_label": form_response.get("solucao_final_categoria_label"),
+            "solucao_final": form_response.get("solucao_final"),
+            "resultado_final": form_response.get("resultado_final"),
+            "resultado_final_label": form_response.get("resultado_final_label"),
+            "resolvido_por": form_response.get("resolvido_por"),
+            "resolvido_em": form_response.get("resolvido_em"),
+            "Solução final": form_response.get("Solução final"),
+            "Resultado final": form_response.get("Resultado final"),
             "thread":              channel.name,
             "thread_id":           channel.id,
             "canal_logs":          canal_logs_id,
@@ -606,7 +735,8 @@ def setup(bot: commands.Bot) -> None:
         view = LogsFormView(guild_id=guild.id, timeout=120.0)
         try:
             await ctx.reply(
-                "Por favor, selecione **Empresa** e **Nível** e clique em **Confirmar**.",
+                "Preencha **Empresa**, **Nível**, **Solução**, **Resultado**, descreva "
+                "o que foi feito e clique em **Confirmar**.",
                 view=view,
                 mention_author=False,
             )

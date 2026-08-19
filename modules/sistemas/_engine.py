@@ -4,8 +4,8 @@ _engine.py — Estado compartilhado, helpers e engine genérica de diagnóstico.
 Contém:
   - PENDING_PAYLOADS, SISTEMAS_CONFIG, _STEPS_PADRAO
   - Funções utilitárias usadas por todos os sub-módulos
-  - DiagnosticoView  (cache → reiniciar → aguardar 5min)
-  - ProblemTypeView  (5 botões de tipo de problema)
+  - DiagnosticoView  (fluxo legado para tópicos já existentes)
+  - ProblemTypeView  (classifica o problema e inicia a conversa com IA)
 """
 
 import asyncio
@@ -257,6 +257,51 @@ def _member_has_role(member: Optional[discord.Member], role_ids: set[int]) -> bo
     return any(r.id in role_ids for r in member.roles)
 
 
+_PROBLEM_TYPE_LABELS = {
+    "lentidao_travamento": "Lentidão ou travamento",
+    "pagina_nao_carrega": "Página não carrega",
+    "permissao_cadastro": "Permissão ou cadastro",
+    "mensagem_de_erro": "Mensagem de erro",
+    "mensagem_de_aviso": "Mensagem de aviso",
+}
+
+
+def _problem_type_context(sistema: str, tipo: str) -> str:
+    label = _PROBLEM_TYPE_LABELS.get(tipo, tipo.replace("_", " ").strip())
+    return f"Sistema: {sistema}. Tipo de problema selecionado: {label}."
+
+
+async def _start_ai_support(
+    thread: discord.Thread,
+    user: discord.Member | discord.User,
+    *,
+    initial_context: str,
+    handoff_role_id: int | None = None,
+    force_permission_flow: bool = False,
+) -> bool:
+    """Inicia a conversa de IA sem acionar equipe automaticamente em falhas."""
+    try:
+        from modules import ia as ia_module
+
+        await ia_module.start_ai_conversation(
+            thread,
+            user,
+            force_permission_flow=force_permission_flow,
+            initial_context=initial_context,
+            handoff_role_id=handoff_role_id,
+        )
+        return True
+    except Exception as exc:
+        print(f"[SISTEMAS] IA não iniciou automaticamente: {exc}")
+        await thread.send(
+            "⚠️ O chamado foi aberto, mas a IA não conseguiu iniciar agora. "
+            "Você pode tentar novamente com `!ajuda`. Nenhuma equipe foi "
+            "acionada automaticamente.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return False
+
+
 # ── DiagnosticoView ───────────────────────────────────────────────────────────
 
 class DiagnosticoView(discord.ui.View):
@@ -387,7 +432,7 @@ class PrintScreenView(discord.ui.View):
 
 
 class ProblemTypeView(discord.ui.View):
-    """5 botões de tipo de problema. Roteia para o fluxo correto de cada sistema."""
+    """Classifica o problema e inicia a mesma conversa de IA de Equipamentos."""
 
     def __init__(self, sistema: str, original_user_id: int):
         super().__init__(timeout=None)
@@ -405,40 +450,14 @@ class ProblemTypeView(discord.ui.View):
     async def _iniciar_diagnostico(self, interaction: discord.Interaction, tipo: str) -> None:
         cfg = SISTEMAS_CONFIG[self.sistema]
         thread = interaction.channel
-
-        if tipo == "permissao_cadastro":
-            await _disable_view(interaction, self)
-            await interaction.response.defer()
-
-            pergunta = _get_pergunta(self.sistema, cfg["steps"][0])
-            await thread.send(
-                pergunta,
-                view=DiagnosticoView(self.sistema, 0, self.original_user_id),
-            )
-            return
-
-        if tipo == "lentidao_travamento" and cfg.get("lentidao_especial"):
-            await _disable_view(interaction, self)
-            await interaction.response.defer()
-            # Import lazy — ClickupSlowView está em _clickup, que importa de _engine
-            from ._clickup import ClickupSlowView
-            await thread.send(
-                "⚙️ Observação técnica: o ClickUp é hospedado nos EUA e, em períodos de maior "
-                "latência, é comum apresentar lentidão ou travamentos pontuais. Algumas ações que ajudam:\n\n"
-                "• Tente alternar entre a versão web e o app (Windows Store) — às vezes o app é mais estável.\n"
-                "• Limpe cache / força recarga (Ctrl+F5) na versão web.\n"
-                "• Verifique se alguma extensão do navegador pode estar interferindo.\n\n"
-                "Se preferir que a equipe verifique, escolha uma das opções abaixo:",
-                view=ClickupSlowView(self.original_user_id),
-            )
-            return
-
         await _disable_view(interaction, self)
         await interaction.response.defer()
-        pergunta = _get_pergunta(self.sistema, cfg["steps"][0])
-        await thread.send(
-            pergunta,
-            view=DiagnosticoView(self.sistema, 0, self.original_user_id),
+        await _start_ai_support(
+            thread,
+            interaction.user,
+            initial_context=_problem_type_context(self.sistema, tipo),
+            handoff_role_id=cfg.get("role_id"),
+            force_permission_flow=tipo == "permissao_cadastro",
         )
 
     @discord.ui.button(label="🐢lentidão/travamento🐢", style=discord.ButtonStyle.primary)
