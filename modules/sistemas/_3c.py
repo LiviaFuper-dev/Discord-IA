@@ -3,7 +3,7 @@ _3cplus.py — Sistema 3c+.
 
 Fluxo:
   Usuário clica "3c+" no ServicesView → thread "1 - 3c+ - {usuario}"
-  → pinga o cargo responsável
+  → inicia conversa com IA; o cargo só é marcado após confirmação do usuário
   → TI digita !sistema → payload enviado ao N8N
 """
 
@@ -12,13 +12,13 @@ import datetime
 import discord
 
 import config
-from ._engine import PENDING_PAYLOADS, _ping_role, set_payload
+from ._engine import _start_ai_support, set_payload
 
 _CARGO_3CPLUS_ID = config.TRESCEPLUS_ROLE_ID
 
 
 async def _abrir_3cplus(interaction: discord.Interaction) -> None:
-    """Cria a thread do 3c+, inicializa o payload e pinga o cargo."""
+    """Cria a thread do 3c+, inicializa o payload e inicia a IA."""
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
     channel = interaction.channel
@@ -70,11 +70,14 @@ async def _abrir_3cplus(interaction: discord.Interaction) -> None:
     })
     print(f"[3CPLUS] Payload inicializado: thread {thread.id}")
 
-    await _ping_role(
-        thread, guild, _CARGO_3CPLUS_ID,
-        f"Olá, {user.mention}! Tudo bem? 😊\n\n"
-        "Recebemos seu chamado sobre o **3c+**.\n"
-        "Por favor, descreva aqui o que está acontecendo e nossa equipe entrará em contato em breve.",
+    await _start_ai_support(
+        thread,
+        user,
+        initial_context=(
+            "Sistema: 3c+. O solicitante ainda precisa descrever o problema; "
+            "comece perguntando de forma simples o que está acontecendo."
+        ),
+        handoff_role_id=_CARGO_3CPLUS_ID,
     )
 
     await interaction.followup.send("Tópico criado! Acesse-o para continuar.", ephemeral=True)

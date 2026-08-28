@@ -12,17 +12,29 @@ Auto-fechamento por inatividade:
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# Evita que emojis nos logs interrompam o on_ready no Windows quando stdout ou
+# stderr estão redirecionados e, por padrão, usam uma página de código limitada.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
 
 import discord
 from discord.ext import commands, tasks
 
 import config
 from modules import contato as contato_module
+from modules import ia as ia_module
 from modules import sistemas as sistemas_module
 from modules import ti as ti_module
 from utils.pending_chamados import PendingChamadoView, chamado_pendente_existe, criar_card_pendente
+from utils.historical_knowledge import refresh_clickup_knowledge
+from utils.clickup import ClickUpError
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Bot
@@ -33,12 +45,50 @@ intents.message_content = True
 intents.members = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+class CaveiraBot(commands.Bot):
+    async def setup_hook(self) -> None:
+        """
+        Registra comandos e views persistentes antes de conectar ao Gateway.
 
-PENDING_INACTIVITY_SECONDS = 30
-PENDING_IGNORE_BEFORE = datetime(2026, 7, 17, tzinfo=timezone.utc)
+        Fazer isso no on_ready deixa uma janela em que mensagens antigas já estão
+        clicáveis, mas os custom_id ainda não possuem callbacks registrados.
+        setup_hook também é executado apenas uma vez, ao contrário de on_ready,
+        que pode rodar novamente após uma reconexão.
+        """
+        setup_modules()
+        self.add_view(MainMenuView())
+        self.add_view(ti_module.UrgenciaView())
+        self.add_view(sistemas_module.ServicesView())
+        self.add_view(PendingChamadoView(self))
+
+
+bot = CaveiraBot(command_prefix="!", intents=intents, help_command=None)
+
+PENDING_INACTIVITY_SECONDS = 24 * 60 * 60
+PENDING_IGNORE_BEFORE = datetime(2026, 7, 8, tzinfo=timezone.utc)
 _HANDLED_FILE = Path("data/thread_auto_actions.json")
 _HANDLED_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+@tasks.loop(minutes=config.CLICKUP_KNOWLEDGE_REFRESH_MINUTES)
+async def atualizar_conhecimento_clickup() -> None:
+    """Atualiza padrões agregados de soluções, sem alterar o ClickUp."""
+    if not config.CLICKUP_KNOWLEDGE_ENABLED:
+        return
+    if not config.CLICKUP_API_TOKEN or not config.CLICKUP_SUPPORT_LIST_IDS:
+        print("[CLICKUP-IA] Atualização ignorada: listas ou token não configurados.")
+        return
+    try:
+        report = await refresh_clickup_knowledge()
+        print(
+            "[CLICKUP-IA] Base histórica atualizada: "
+            f"{report['tasks_read']} chamado(s) lido(s), "
+            f"{report['patterns']} padrão(ões) aproveitável(is)."
+        )
+    except ClickUpError as exc:
+        print(f"[CLICKUP-IA] Não foi possível atualizar a base histórica: {exc}")
+    except Exception as exc:
+        print(f"[CLICKUP-IA] Erro inesperado ao atualizar a base histórica: {exc}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -648,6 +698,7 @@ def setup_modules() -> None:
     ti_module.setup(bot)
     contato_module.setup(bot)
     sistemas_module.setup(bot)
+    ia_module.setup(bot)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -658,16 +709,21 @@ def setup_modules() -> None:
 async def on_ready():
     print(f"✅ Bot conectado como {bot.user} (ID: {bot.user.id})")
 
-    bot.add_view(MainMenuView())
-    bot.add_view(ti_module.UrgenciaView())
-    bot.add_view(sistemas_module.ServicesView())
-    bot.add_view(PendingChamadoView(bot))
-
     contato_module.start_tasks()
 
     if not auto_fechar_inativos.is_running():
         auto_fechar_inativos.start()
         print(f"✅ Monitor de pendentes iniciado (inatividade: {PENDING_INACTIVITY_SECONDS}s).")
+
+    if (
+        config.CLICKUP_KNOWLEDGE_ENABLED
+        and not atualizar_conhecimento_clickup.is_running()
+    ):
+        atualizar_conhecimento_clickup.start()
+        print(
+            "✅ Atualização automática da base de soluções do ClickUp iniciada "
+            f"(a cada {config.CLICKUP_KNOWLEDGE_REFRESH_MINUTES} min)."
+        )
 
     for guild_id, srv_cfg in config.SERVIDORES.items():
         nome = srv_cfg.get("nome", str(guild_id))
@@ -739,6 +795,25 @@ async def help_cmd(ctx: commands.Context):
         ),
         inline=False,
     )
+    embed.add_field(
+        name="🤖 `!ia`",
+        value=(
+            "Usado por atendentes para uma análise pontual em tópicos de **Sistemas** "
+            "ou **Equipamentos**."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="💬 `!ajuda` / `!resumo` / `!encerrar_ia`",
+        value=(
+            "Em chamados de **Equipamentos**, a conversa com IA começa automaticamente.\n"
+            "`!ajuda` continua disponível para iniciar manualmente quando necessário.\n"
+            "`!resumo` permite que um atendente gere a passagem estruturada do chamado.\n"
+            "`!encerrar_ia` encerra a conversa automática e também gera o resumo.\n"
+            "Os comandos são bloqueados em Recuperar Contato."
+        ),
+        inline=False,
+    )
     embed.set_footer(text="Todos os comandos só funcionam dentro dos tópicos correspondentes.")
     await ctx.reply(embed=embed, mention_author=False)
 
@@ -769,5 +844,4 @@ if __name__ == "__main__":
     if not config.DISCORD_TOKEN:
         print("❌ DISCORD_TOKEN não definido no .env")
     else:
-        setup_modules()
         bot.run(config.DISCORD_TOKEN)

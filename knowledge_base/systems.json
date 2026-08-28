@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "systems": {
+    "ChatGuru": {
+      "aliases": ["chatguru", "chat guru"],
+      "responsible": "Operações / responsável pelo ChatGuru",
+      "problem_types": {
+        "mensagem_de_erro": {
+          "required_questions": ["código e texto exatos do balão", "o que estava tentando enviar", "se ocorre com um ou vários contatos"],
+          "safe_actions": ["passar o mouse na exclamação e copiar o código", "usar template aprovado quando a janela de 24 horas estiver fechada", "reenviar mídia em formato ou tamanho suportado"],
+          "avoid": ["insistir em envio bloqueado", "inventar ou alterar template", "pedir credenciais ou dados do cliente"],
+          "escalate_when": ["código não consta na base", "saldo, limite, template ou restrição da Meta exigem ação de responsável"]
+        },
+        "mensagem_de_aviso": {
+          "required_questions": ["texto do aviso", "o que ainda funciona e o que ficou impedido", "quando começou"],
+          "safe_actions": ["registrar o aviso e a tela sem dados pessoais", "tentar novamente apenas se o POP do código orientar"],
+          "avoid": ["prometer liberação da Meta", "alterar configurações de conta"],
+          "escalate_when": ["aviso impede envio ou não há orientação aprovada"]
+        },
+        "default": {
+          "required_questions": ["ação que a pessoa tentava fazer", "comportamento observado e desde quando", "se cache, Ctrl+F5 e reinício já foram tentados"],
+          "safe_actions": ["limpar cache", "atualizar com Ctrl+F5", "aguardar cinco minutos antes de repetir"],
+          "avoid": ["repetir teste já respondido", "pedir senha, token ou acesso remoto"],
+          "escalate_when": ["dois testes simples não resolvem ou há erro não identificado"]
+        }
+      },
+      "error_solutions": {
+        "470": "Janela de 24 horas fechada: usar somente template aprovado e aguardar resposta do contato.",
+        "131047": "Janela de 24 horas fechada: usar somente template aprovado e aguardar resposta do contato.",
+        "131049": "Restrição de engajamento da Meta: não insistir; usar contato alternativo autorizado ou template aprovado.",
+        "1008": "Campo de texto inválido: revisar espaços e caracteres dos campos antes de reenviar.",
+        "130472": "Número em experimento da Meta: usar canal alternativo autorizado e pedir que o contato inicie nova conversa.",
+        "131050": "Contato optou por não receber marketing: aguardar nova iniciativa do contato.",
+        "131053": "Falha de mídia: reenviar em formato ou tamanho suportado.",
+        "9999": "Saldo insuficiente: encaminhar ao responsável pela conta.",
+        "130429": "Limite temporário de envio: reduzir o volume e aguardar o período indicado.",
+        "131026": "Destinatário indisponível: conferir o número por canal autorizado ou usar contato alternativo.",
+        "132001": "Template inexistente ou indisponível: usar outro template aprovado no diálogo correto.",
+        "132015": "Template pausado: usar outro template aprovado e aguardar validação dos responsáveis.",
+        "4003": "Template incompatível: usar o diálogo correto ou outro template aprovado; não improvisar."
+      }
+    },
+    "Whom": {
+      "aliases": ["whom"],
+      "responsible": "Equipe responsável pelo Whom",
+      "problem_types": {
+        "permissao_cadastro": {
+          "required_questions": ["qual acesso ou cadastro falta", "se já teve esse acesso", "urgência"],
+          "safe_actions": [],
+          "avoid": ["limpar cache", "atualizar ou reiniciar como solução de acesso"],
+          "escalate_when": ["o solicitante confirmar que quer atendimento humano"]
+        },
+        "default": {
+          "required_questions": ["ação que não funciona", "se a extensão mostra aviso vermelho ou amarelo", "o que aparece ao clicar em Status", "se cache, Ctrl+F5, espera de cinco minutos e reinício já foram tentados"],
+          "safe_actions": ["atualizar a página", "limpar cache", "aguardar cinco minutos"],
+          "avoid": ["alterar configuração interna da extensão", "pedir senha ou acesso remoto"],
+          "escalate_when": ["aviso persiste após tentativas simples ou solicitante pedir pessoa"]
+        }
+      }
+    },
+    "Clickup": {
+      "aliases": ["clickup", "click up"],
+      "responsible": "Equipe responsável pelo ClickUp",
+      "problem_types": {
+        "permissao_cadastro": {
+          "required_questions": ["qual espaço, lista ou tarefa precisa acessar", "se já teve acesso", "urgência"],
+          "safe_actions": [],
+          "avoid": ["limpar cache como solução de permissão", "alterar campos, automações ou permissões"],
+          "escalate_when": ["o solicitante confirmar que quer atendimento humano"]
+        },
+        "default": {
+          "required_questions": ["se o ClickUp inteiro, uma lista ou uma tarefa está afetada", "ação que demora ou não conclui", "desde quando", "se outras pessoas têm o mesmo problema", "se Ctrl+F5, cache, espera, reinício e outro navegador já foram tentados"],
+          "safe_actions": ["atualizar com Ctrl+F5", "testar outro navegador", "aguardar cinco minutos"],
+          "avoid": ["alterar automações, campos ou integrações", "pedir acesso remoto"],
+          "escalate_when": ["falha persiste após testes simples ou envolve automação, integração ou permissão"]
+        }
+      }
+    },
+    "E-mail e Google Drive": {
+      "aliases": ["e-mail", "email", "google drive", "drive"],
+      "responsible": "Equipe responsável pelo domínio informado",
+      "problem_types": {
+        "default": {
+          "required_questions": ["se não consegue entrar, enviar, receber, abrir ou localizar", "se ocorre no navegador ou aplicativo", "texto do erro e quando começou", "se outras pessoas também são afetadas"],
+          "safe_actions": ["testar o navegador ou aplicativo autorizado", "registrar a mensagem de erro"],
+          "avoid": ["pedir senha ou código de autenticação", "alterar configuração de conta sem validação"],
+          "escalate_when": ["problema de conta, domínio, permissão ou falha persiste"]
+        }
+      }
+    },
+    "Falepaco": {
+      "aliases": ["falepaco"],
+      "responsible": "TI autorizado / gestor quando for senha",
+      "problem_types": {
+        "default": {
+          "required_questions": ["se é baixar, instalar, abrir ou usar", "etapa e mensagem exibida"],
+          "safe_actions": ["repetir o download quando indicado pelo POP"],
+          "avoid": ["pedir ou registrar senha", "solicitar AnyDesk; acesso remoto só é combinado pelo TI autorizado"],
+          "escalate_when": ["download ou instalação precisam de TI e o solicitante pedir atendimento"]
+        }
+      }
+    },
+    "Robôs/Automações": {
+      "aliases": ["robôs", "robos", "automações", "automacoes", "inss", "planilhas"],
+      "responsible": "TI / Operações e Sistemas",
+      "problem_types": {
+        "INSS": {
+          "required_questions": ["se faltam documentos", "se ocorre em um, vários ou todos os clientes", "se o documento faltante é sempre o mesmo ou varia", "mensagem exibida sem dados do cliente"],
+          "safe_actions": ["enviar print sem dados sensíveis"],
+          "avoid": ["pedir documento, CPF ou credencial do cliente", "alterar a automação"],
+          "escalate_when": ["afeta todos os clientes ou persiste após coleta do contexto"]
+        },
+        "ChatGuru": {
+          "required_questions": ["se nenhuma ou apenas algumas imagens são baixadas", "quando começou e em qual etapa", "mensagem exibida"],
+          "safe_actions": ["enviar print sem dados sensíveis"],
+          "avoid": ["alterar a automação sem validação"],
+          "escalate_when": ["não baixa nenhuma imagem ou persiste após coleta"]
+        },
+        "default": {
+          "required_questions": ["qual automação", "resultado esperado e observado", "desde quando e alcance", "mensagem ou código do erro"],
+          "safe_actions": ["enviar print sem dados sensíveis"],
+          "avoid": ["alterar automação, planilha ou integração"],
+          "escalate_when": ["resultado incorreto persiste ou envolve alteração de fluxo"]
+        }
+      }
+    },
+    "3c+": {
+      "aliases": ["3c", "3c+"],
+      "responsible": "Equipe responsável pelo 3c+",
+      "problem_types": {
+        "default": {
+          "required_questions": ["o que precisava fazer", "o que apareceu e desde quando", "se afeta um caso ou vários", "texto do erro ou print sem dados pessoais"],
+          "safe_actions": ["registrar a mensagem exibida"],
+          "avoid": ["pedir dados pessoais desnecessários", "alterar configurações sem validação"],
+          "escalate_when": ["não há teste seguro ou solicitante pedir atendimento humano"]
+        }
+      }
+    }
+  }
+}

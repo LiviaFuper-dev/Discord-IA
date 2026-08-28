@@ -2,9 +2,8 @@
 _email_base.py — Módulo base para suporte de E-mail e Google Drive.
 
 Ambos os fluxos são idênticos: perguntam o domínio do e-mail,
-abrem modal com e-mail + descrição, detectam o cargo pelo domínio
-e pingam a equipe correta. A única diferença é o nome do sistema,
-emoji e prefixo de log.
+abrem modal com e-mail + descrição, detectam o cargo pelo domínio e iniciam
+a conversa com IA. O cargo correto só é marcado após confirmação do usuário.
 """
 
 import datetime
@@ -12,7 +11,7 @@ import datetime
 import discord
 
 import config
-from ._engine import _disable_view, _ping_role, _update_step, set_payload
+from ._engine import _disable_view, _start_ai_support, _update_step, set_payload
 
 
 def _detectar_role_id(email: str) -> int:
@@ -68,17 +67,19 @@ def make_info_modal(system_name: str, emoji: str):
 
             await interaction.response.defer()
 
-            await _ping_role(
+            await thread.send(
+                f"{emoji} **Chamado de {system_name}**\n\n"
+                f"📬 **E-mail informado:** `{email_value}`\n"
+                f"📝 **Problema relatado:**\n> {problema_value}",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            await _start_ai_support(
                 thread,
-                guild,
-                role_id,
-                (
-                    f"{emoji} **Novo chamado de {system_name}**\n\n"
-                    f"👤 **Usuário:** {user.mention}\n"
-                    f"📬 **E-mail informado:** `{email_value}`\n"
-                    f"🏷️ **Encaminhado para:** {dominio_label}\n\n"
-                    f"📝 **Problema relatado:**\n> {problema_value}"
+                user,
+                initial_context=(
+                    f"Sistema: {system_name}. Domínio informado: {dominio_label}."
                 ),
+                handoff_role_id=role_id,
             )
 
     _InfoModal.__qualname__ = f"{system_name.replace(' ', '')}InfoModal"

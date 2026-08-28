@@ -25,6 +25,35 @@ N8N_WEBHOOK_SISTEMAS: str = os.getenv("N8N_WEBHOOK_URL_SIS", "")
 N8N_WEBHOOK_CONTATO: str  = os.getenv("N8N_WEBHOOK_URL_CONT", "")
 # SDR não envia para N8N
 
+# ── Inteligência artificial (Groq) ────────────────────────────────────────────
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+AI_MODEL: str = os.getenv("AI_MODEL", "openai/gpt-oss-20b")
+GROQ_CHAT_COMPLETIONS_URL: str = "https://api.groq.com/openai/v1/chat/completions"
+
+# ── Consulta pública de códigos de erro ────────────────────────────────────────
+# A pesquisa recebe somente o nome do sistema e o código (nunca a conversa inteira).
+ERROR_WEB_SEARCH_ENABLED: bool = os.getenv(
+    "ERROR_WEB_SEARCH_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes", "sim"}
+
+# ── ClickUp (leitura de histórico para análise de chamados) ───────────────────
+CLICKUP_API_TOKEN: str = os.getenv("CLICKUP_API_TOKEN", "").strip()
+CLICKUP_SUPPORT_LIST_IDS: tuple[str, ...] = tuple(
+    item.strip()
+    for item in os.getenv("CLICKUP_SUPPORT_LIST_IDS", "").split(",")
+    if item.strip()
+)
+CLICKUP_API_BASE_URL: str = "https://api.clickup.com/api/v2"
+CLICKUP_KNOWLEDGE_ENABLED: bool = os.getenv(
+    "CLICKUP_KNOWLEDGE_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes", "sim"}
+CLICKUP_KNOWLEDGE_REFRESH_MINUTES: int = max(
+    30, int(os.getenv("CLICKUP_KNOWLEDGE_REFRESH_MINUTES", "360"))
+)
+CLICKUP_KNOWLEDGE_MAX_PAGES: int = max(
+    1, int(os.getenv("CLICKUP_KNOWLEDGE_MAX_PAGES", "20"))
+)
+
 # ── SDR ────────────────────────────────────────────────────────────────────────
 SDR_FORM_URL: str = (
     "https://docs.google.com/forms/d/e/"
